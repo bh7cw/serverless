@@ -21,3 +21,6 @@ serverless
 .DS_Store
 
 src/
+
+*.zip
+main

@@ -10,10 +10,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/dynamodb"
-	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 	"github.com/aws/aws-sdk-go/service/ses"
 	"log"
-	"os"
 	"strings"
 	"time"
 )
@@ -22,7 +20,7 @@ import (
 const (
 	// Replace sender@example.com with your "From" address.
 	// This address must be verified with Amazon SES.
-	Sender = "update@prod.bh7cw.me"//"ibh7cw@gmail.com"
+	Sender = "update@prod.bh7cw.me" //"ibh7cw@gmail.com"
 
 	// The character encoding for the email.
 	CharSet = "UTF-8"
@@ -31,12 +29,6 @@ const (
 var sess *session.Session
 var svc_ses *ses.SES
 var svc_db *dynamodb.DynamoDB
-
-type Email struct {
-	Subject   string
-	HtmlBody  string
-	TextBody   string
-}
 
 func handleRequest(ctx context.Context, event events.SNSEvent) error {
 	log.Print("Event started: ")
@@ -53,29 +45,22 @@ func handleRequest(ctx context.Context, event events.SNSEvent) error {
 	log.Printf("Invocation started: %v", currentTime.Format("2020-11-26 15:04:05"))
 
 	//log sns event is null
-	log.Printf("Event is NULL: %v", event.Records==nil)
+	log.Printf("Event is NULL: %v", event.Records == nil)
 
 	//log number of records
 	log.Printf("Number of Records: %v", len(event.Records))
 
 	//log record message
-	for i, m := range event.Records {
-		log.Printf("Record Message No.%v: %v", i, m.SNS.Message)
+	for _, m := range event.Records {
+		log.Printf("Record Message: %v", m.SNS.Message)
 
 		//send email to the user with sns notification message
-		SendSESEmail(m.SNS.Message)
+		SendSESEmail(m.SNS.Message, m.SNS.UnsubscribeURL)
 	}
 
 	//log timestamp
 	currentTime = time.Now()
 	log.Printf("Invocation completed: %v", currentTime.Format("2020-11-26 15:04:05"))
-
-	// environment variables
-	log.Printf("REGION: %s", os.Getenv("AWS_REGION"))
-	log.Println("ALL ENV VARS:")
-	for _, element := range os.Environ() {
-		log.Println(element)
-	}
 
 	return nil
 }
@@ -86,6 +71,20 @@ func initSession() *session.Session {
 		newSess, err := session.NewSession(&aws.Config{
 			Region:aws.String("us-east-1")},
 		)
+		/*test locally
+		newSess, err := session.NewSessionWithOptions(session.Options{
+			// Specify profile to load for the session's config
+			Profile: "prod",
+
+			// Provide SDK Config options, such as Region.
+			Config: aws.Config{
+				Region: aws.String("us-east-1"),
+			},
+
+			// Force enable Shared Config support
+			SharedConfigState: session.SharedConfigEnable,
+		})*/
+
 		if err != nil {
 			log.Println("can't load the aws session")
 			return nil
@@ -118,7 +117,7 @@ func initDBClient() *dynamodb.DynamoDB {
 }
 
 //send email to the user with sns notification message
-func SendSESEmail(message string) {
+func SendSESEmail(message string, unsubscribe_url string) {
 	// Create an SES session.
 	svc_ses := initSESClient()
 
@@ -128,7 +127,7 @@ func SendSESEmail(message string) {
 	//create/update/delete answer: 0
 	//QuestionID: 1
 	//QuestionText: 2
-	//UserName: 3
+	//UserFirstName+LastName: 3
 	//UserEmail: 4
 	//AnswerID: 5
 	//AnswerText: 6
@@ -141,67 +140,72 @@ func SendSESEmail(message string) {
 	}
 
 	//prepare information before assemble the email
-	Recipient := email_context[4]
+	Recipient := strings.TrimSpace(strings.Split(email_context[4], ":")[1])
 
 	Subject := "Notification from bh7cw"
-	HtmlBody :=  "<h1>Notification from bh7cw</h1><p>This email was sent with <a href='https://aws.amazon.com/ses/'>Amazon SES</a> using the <a href='https://aws.amazon.com/sdk-for-go/'>AWS SDK for Go</a>.</p>"
+	HtmlBody := "<h1>Notification from bh7cw</h1><p>This email was sent with <a href='https://aws.amazon.com/ses/'>Amazon SES</a> using the <a href='https://aws.amazon.com/sdk-for-go/'>AWS SDK for Go</a>.</p>"
 	TextBody := "This email was sent from prod.bh7cw.me with Amazon SES."
 
 	if email_context[0] == "create answer" {
-		Subject = fmt.Sprintf("Your question '%v' on bh7cw.me has been answered", email_context[2])
-		HtmlBody = fmt.Sprintf("<h1>Notification from bh7cw.me</h1>" +
-			"<p>Hi %v,</p>" +
-			"<p>The question QuestionID: %v, QuestionText: %v on bh7cw.me has been answered.</p>" +
-			"<p>Answer: AnswerID: %v, AnswerText: %v.</p>" +
-			"<p>See more details in %v.</p>" +
-			"<p>This email was sent from <a href='%v'>bh7cw.me</a> with <a href='https://aws.amazon.com/ses/'>Amazon SES</a>.</p>",
-			email_context[3], email_context[1], email_context[2], email_context[5], email_context[6], email_context[7], email_context[7])
-		TextBody = fmt.Sprintf("Hi %v,\n" +
-			"The question QuestionID: %v, QuestionText: %v on bh7cw.me has been answered.\n" +
-			"Answer: AnswerID: %v, AnswerText: %v.\n" +
-			"See more details in %v.\n" +
-			"This email was sent from bh7cw.me with Amazon SES.\n", email_context[3], email_context[1], email_context[2], email_context[5], email_context[6], email_context[7])
+		Subject = fmt.Sprintf("Your question '%v' on bh7cw.me has been answered", strings.TrimSpace(strings.Split(email_context[2], ":")[1]))
+		HtmlBody = fmt.Sprintf("<h1>Notification from bh7cw.me</h1>"+
+			"<p>Hi %v,</p>"+
+			"<p>The question %v, %v on bh7cw.me has been answered.</p>"+
+			"<p>Answer: %v, %v.</p>"+
+			"<p>See more details in %v.</p>"+
+			"<p>This email was sent from <a href='%v'>bh7cw.me</a> with <a href='https://aws.amazon.com/ses/'>Amazon SES</a>.</p>"+
+			"<p><a href='%v'>Unsubscribe</a></p>",
+			strings.TrimSpace(strings.Split(email_context[3], ":")[1]), email_context[1], email_context[2], email_context[5], email_context[6], email_context[7], email_context[7], unsubscribe_url)
+		TextBody = fmt.Sprintf("Hi %v,\n"+
+			"The question %v, %v on bh7cw.me has been answered.\n"+
+			"Answer: %v, %v.\n"+
+			"See more details in %v.\n"+
+			"This email was sent from bh7cw.me with Amazon SES.\n"+
+			"Unsubscribe: %v.",
+			strings.TrimSpace(strings.Split(email_context[3], ":")[1]), email_context[1], email_context[2], email_context[5], email_context[6], email_context[7],
+			unsubscribe_url)
 	} else if email_context[0] == "update answer" {
-		Subject = fmt.Sprintf("The answer %v to your question %v on bh7cw.me has been updated", email_context[6], email_context[2])
-		HtmlBody = fmt.Sprintf("<h1>Notification from bh7cw.me</h1>" +
-			"<p>Hi %v,</p>" +
-			"<p>The answer to your question QuestionID: %v, QuestionText: %v on bh7cw.me has been updated.</p>" +
-			"<p>Answer: AnswerID: %v, AnswerText: %v.</p>" +
-			"<p>See more details in %v.</p>" +
-			"<p>This email was sent from <a href='%v'>bh7cw.me</a> with <a href='https://aws.amazon.com/ses/'>Amazon SES</a>.</p>",
-			email_context[3], email_context[1], email_context[2], email_context[5], email_context[6], email_context[7], email_context[7])
-		TextBody = fmt.Sprintf("Hi %v,\n" +
-			"The answer to your question QuestionID: %v, QuestionText: %v on bh7cw.me has been updated.\n" +
-			"Answer: AnswerID: %v, AnswerText: %v.\n" +
-			"See more details in %v.\n" +
-			"This email was sent from bh7cw.me with Amazon SES.\n", email_context[3], email_context[1], email_context[2], email_context[5], email_context[6], email_context[7])
+		Subject = fmt.Sprintf("Answer to your question '%v' on bh7cw.me has been updated", strings.TrimSpace(strings.Split(email_context[2], ":")[1]))
+		HtmlBody = fmt.Sprintf("<h1>Notification from bh7cw.me</h1>"+
+			"<p>Hi %v,</p>"+
+			"<p>The answer to your question %v, %v on bh7cw.me has been updated.</p>"+
+			"<p>Answer: %v, %v.</p>"+
+			"<p>See more details in %v.</p>"+
+			"<p>This email was sent from <a href='%v'>bh7cw.me</a> with <a href='https://aws.amazon.com/ses/'>Amazon SES</a>.</p>"+
+			"<p><a href='%v'>Unsubscribe</a></p>",
+			strings.TrimSpace(strings.Split(email_context[3], ":")[1]), email_context[1], email_context[2], email_context[5], email_context[6], email_context[7], email_context[7], unsubscribe_url)
+		TextBody = fmt.Sprintf("Hi %v,\n"+
+			"The answer to your question %v, %v on bh7cw.me has been updated.\n"+
+			"Answer: %v, %v.\n"+
+			"See more details in %v.\n"+
+			"This email was sent from bh7cw.me with Amazon SES.\n"+
+			"Unsubscribe: %v.",
+			strings.TrimSpace(strings.Split(email_context[3], ":")[1]), email_context[1], email_context[2], email_context[5], email_context[6], email_context[7], unsubscribe_url)
 	} else if email_context[0] == "delete answer" {
-		Subject = fmt.Sprintf("The answer %v to your question %v on bh7cw.me has been deleted", email_context[6], email_context[2])
-		HtmlBody = fmt.Sprintf("<h1>Notification from bh7cw.me</h1>" +
-			"<p>Hi %v,</p>" +
-			"<p>The answer AnswerID: %v, AnswerText: %v to your question QuestionID: %v, QuestionText: %v on bh7cw.me has been deleted.</p>" +
-			"<p>This email was sent from bh7cw.me with <a href='https://aws.amazon.com/ses/'>Amazon SES</a>.</p>",
-			email_context[3], email_context[5], email_context[6], email_context[1], email_context[2])
-		TextBody = fmt.Sprintf("Hi %v,\n" +
-			"The answer AnswerID: %v, AnswerText: %v to your question QuestionID: %v, QuestionText: %v on bh7cw.me has been deleted.\n" +
-			"This email was sent from bh7cw.me with Amazon SES.\n", email_context[3], email_context[5], email_context[6], email_context[1], email_context[2])
+		Subject = fmt.Sprintf("The answer '%v' to your question '%v' on bh7cw.me has been deleted", strings.TrimSpace(strings.Split(email_context[6], ":")[1]), strings.TrimSpace(strings.Split(email_context[2], ":")[1]))
+		HtmlBody = fmt.Sprintf("<h1>Notification from bh7cw.me</h1>"+
+			"<p>Hi %v,</p>"+
+			"<p>The answer %v, %v to your question %v, %v on bh7cw.me has been deleted.</p>"+
+			"<p>This email was sent from bh7cw.me with <a href='https://aws.amazon.com/ses/'>Amazon SES</a>.</p>"+
+			"<p><a href='%v'>Unsubscribe</a></p>",
+			strings.TrimSpace(strings.Split(email_context[3], ":")[1]), email_context[5], email_context[6], email_context[1], email_context[2], unsubscribe_url)
+		TextBody = fmt.Sprintf("Hi %v,\n"+
+			"The answer %v, %v to your question %v, %v on bh7cw.me has been deleted.\n"+
+			"This email was sent from bh7cw.me with Amazon SES.\n"+
+			"Unsubscribe: %v.",
+			strings.TrimSpace(strings.Split(email_context[3], ":")[1]), email_context[5], email_context[6], email_context[1], email_context[2], unsubscribe_url)
 	} else {
 		log.Println("The message is not started as expected")
 	}
 
-	email := Email{
-		Subject: Subject,
-		HtmlBody: HtmlBody,
-		TextBody: TextBody,
-	}
-
 	//search for email, if already sent, return, otherwise, put in DynamoDB table, and send email
-	isExist := searchItemInDynamoDB(email)
+	isExist := searchItemInDynamoDB(TextBody)
 	if isExist {
+		log.Println("The email has already been sent")
 		return
 	}
 
-	if err := addItemToDynamoDB(email); err != nil {
+	if err := addItemToDynamoDB(TextBody); err != nil {
 		log.Printf("Failed to put email item into DynamoDB table: %v", err)
 		return
 	}
@@ -209,8 +213,7 @@ func SendSESEmail(message string) {
 	// Assemble the email.
 	input := &ses.SendEmailInput{
 		Destination: &ses.Destination{
-			CcAddresses: []*string{
-			},
+			CcAddresses: []*string{},
 			ToAddresses: []*string{
 				aws.String(Recipient),
 			},
@@ -265,7 +268,7 @@ func SendSESEmail(message string) {
 	log.Println(result)
 }
 
-func searchItemInDynamoDB(email Email) bool {
+func searchItemInDynamoDB(TextBody string) bool {
 	//initialize dynamodb client
 	svc_db := initDBClient()
 
@@ -274,19 +277,17 @@ func searchItemInDynamoDB(email Email) bool {
 	result, err := svc_db.GetItem(&dynamodb.GetItemInput{
 		TableName: aws.String(tableName),
 		Key: map[string]*dynamodb.AttributeValue{
-			"Subject": {
-				N: aws.String(email.Subject),
-			},
-			"HtmlBody": {
-				S: aws.String(email.HtmlBody),
-			},
-			"TextBody": {
-				S: aws.String(email.TextBody),
+			"id": {
+				S: aws.String(TextBody),
 			},
 		},
 	})
 	if err != nil {
 		log.Println(err.Error())
+		return false
+	}
+	if result.Item == nil {
+		log.Println("Search email in dynamodb: false")
 		return false
 	}
 
@@ -296,34 +297,37 @@ func searchItemInDynamoDB(email Email) bool {
 
 //add the email to DynomoDB to avoid sending duplicate emails to users
 //refer to https://docs.aws.amazon.com/sdk-for-go/v1/developer-guide/dynamo-example-create-table-item.html
-func addItemToDynamoDB(email Email) error {
+func addItemToDynamoDB(TextBody string) error {
 	//initialize dynamodb client
 	svc_db := initDBClient()
 
 	tableName := "csye6225"
 
-	av, err := dynamodbattribute.MarshalMap(email)
-	if err != nil {
-		log.Printf("Got error marshalling new email item: %v\n", err)
-		return err
+	item := map[string]*dynamodb.AttributeValue{
+		"id": {
+			S: aws.String(TextBody),
+		},
 	}
 
 	input := &dynamodb.PutItemInput{
-		Item:      av,
+		Item:      item,
 		TableName: aws.String(tableName),
 	}
 
-	_, err = svc_db.PutItem(input)
+	_, err := svc_db.PutItem(input)
 	if err != nil {
 		log.Printf("Got error calling PutItem: %v\n", err)
 		return err
 	}
 
-	log.Println("Successfully added email with subject: '" + email.Subject + "'")
+	log.Println("Successfully added email: '" + TextBody + "'")
 
 	return nil
 }
 
 func main() {
 	lambda.Start(handleRequest)
+	//test
+	//SendSESEmail("update answer, QuestionID: 1, QuestionText: meaning of cat, UserName: Jane Jenny, UserEmail: jingzhangng20@gmail.com, AnswerID: 1, AnswerText: lovely, Link: http://prod.bh7cw.me:80/v1/question/b1db1852-5c5f-457c-b94d-56b917064eee/answer/931bb982-3573-4187-a8e6-d0870901b880","https://sns.us-east-1.amazonaws.com/?Action=Unsubscribe\u0026SubscriptionArn=arn:aws:sns:us-east-1:907204364947:topic:93f10269-ced3-41e2-bf2c-484d0edbf8d1")
+	//SendSESEmail("delete answer, QuestionID: 1, QuestionText: meaning of cat, UserName: Jane Jenny, UserEmail: jingzhangng20@gmail.com, AnswerID: 1, AnswerText: lovely")
 }
