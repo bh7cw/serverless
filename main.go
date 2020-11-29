@@ -127,7 +127,7 @@ func SendSESEmail(message string, unsubscribe_url string) {
 	//create/update/delete answer: 0
 	//QuestionID: 1
 	//QuestionText: 2
-	//UserName: 3
+	//UserFirstName+LastName: 3
 	//UserEmail: 4
 	//AnswerID: 5
 	//AnswerText: 6
@@ -140,14 +140,14 @@ func SendSESEmail(message string, unsubscribe_url string) {
 	}
 
 	//prepare information before assemble the email
-	Recipient := strings.TrimLeft(email_context[4], "UserEmail: ")
+	Recipient := strings.TrimSpace(strings.Split(email_context[4], ":")[1])
 
 	Subject := "Notification from bh7cw"
 	HtmlBody := "<h1>Notification from bh7cw</h1><p>This email was sent with <a href='https://aws.amazon.com/ses/'>Amazon SES</a> using the <a href='https://aws.amazon.com/sdk-for-go/'>AWS SDK for Go</a>.</p>"
 	TextBody := "This email was sent from prod.bh7cw.me with Amazon SES."
 
 	if email_context[0] == "create answer" {
-		Subject = fmt.Sprintf("Your question '%v' on bh7cw.me has been answered", strings.TrimLeft(email_context[2], "QuestionText: "))
+		Subject = fmt.Sprintf("Your question '%v' on bh7cw.me has been answered", strings.TrimSpace(strings.Split(email_context[2], ":")[1]))
 		HtmlBody = fmt.Sprintf("<h1>Notification from bh7cw.me</h1>"+
 			"<p>Hi %v,</p>"+
 			"<p>The question %v, %v on bh7cw.me has been answered.</p>"+
@@ -155,17 +155,17 @@ func SendSESEmail(message string, unsubscribe_url string) {
 			"<p>See more details in %v.</p>"+
 			"<p>This email was sent from <a href='%v'>bh7cw.me</a> with <a href='https://aws.amazon.com/ses/'>Amazon SES</a>.</p>"+
 			"<p><a href='%v'>Unsubscribe</a></p>",
-			strings.TrimLeft(email_context[3], "UserName: "), email_context[1], email_context[2], email_context[5], email_context[6], email_context[7], email_context[7], unsubscribe_url)
+			strings.TrimSpace(strings.Split(email_context[3], ":")[1]), email_context[1], email_context[2], email_context[5], email_context[6], email_context[7], email_context[7], unsubscribe_url)
 		TextBody = fmt.Sprintf("Hi %v,\n"+
 			"The question %v, %v on bh7cw.me has been answered.\n"+
 			"Answer: %v, %v.\n"+
 			"See more details in %v.\n"+
 			"This email was sent from bh7cw.me with Amazon SES.\n"+
 			"Unsubscribe: %v.",
-			strings.TrimLeft(email_context[3], "UserName: "), email_context[1], email_context[2], email_context[5], email_context[6], email_context[7],
+			strings.TrimSpace(strings.Split(email_context[3], ":")[1]), email_context[1], email_context[2], email_context[5], email_context[6], email_context[7],
 			unsubscribe_url)
 	} else if email_context[0] == "update answer" {
-		Subject = fmt.Sprintf("The answer '%v' to your question '%v' on bh7cw.me has been updated", strings.TrimLeft(email_context[6], "AnswerText: "), strings.TrimLeft(email_context[2], "QuestionText: "))
+		Subject = fmt.Sprintf("Answer to your question '%v' on bh7cw.me has been updated", strings.TrimSpace(strings.Split(email_context[2], ":")[1]))
 		HtmlBody = fmt.Sprintf("<h1>Notification from bh7cw.me</h1>"+
 			"<p>Hi %v,</p>"+
 			"<p>The answer to your question %v, %v on bh7cw.me has been updated.</p>"+
@@ -173,27 +173,27 @@ func SendSESEmail(message string, unsubscribe_url string) {
 			"<p>See more details in %v.</p>"+
 			"<p>This email was sent from <a href='%v'>bh7cw.me</a> with <a href='https://aws.amazon.com/ses/'>Amazon SES</a>.</p>"+
 			"<p><a href='%v'>Unsubscribe</a></p>",
-			strings.TrimLeft(email_context[3], "UserName: "), email_context[1], email_context[2], email_context[5], email_context[6], email_context[7], email_context[7], unsubscribe_url)
+			strings.TrimSpace(strings.Split(email_context[3], ":")[1]), email_context[1], email_context[2], email_context[5], email_context[6], email_context[7], email_context[7], unsubscribe_url)
 		TextBody = fmt.Sprintf("Hi %v,\n"+
 			"The answer to your question %v, %v on bh7cw.me has been updated.\n"+
 			"Answer: %v, %v.\n"+
 			"See more details in %v.\n"+
 			"This email was sent from bh7cw.me with Amazon SES.\n"+
 			"Unsubscribe: %v.",
-			strings.TrimLeft(email_context[3], "UserName: "), email_context[1], email_context[2], email_context[5], email_context[6], email_context[7], unsubscribe_url)
+			strings.TrimSpace(strings.Split(email_context[3], ":")[1]), email_context[1], email_context[2], email_context[5], email_context[6], email_context[7], unsubscribe_url)
 	} else if email_context[0] == "delete answer" {
-		Subject = fmt.Sprintf("The answer '%v' to your question '%v' on bh7cw.me has been deleted", strings.TrimLeft(email_context[6], "AnswerText: "), strings.TrimLeft(email_context[2], "QuestionText: "))
+		Subject = fmt.Sprintf("The answer '%v' to your question '%v' on bh7cw.me has been deleted", strings.TrimSpace(strings.Split(email_context[6], ":")[1]), strings.TrimSpace(strings.Split(email_context[2], ":")[1]))
 		HtmlBody = fmt.Sprintf("<h1>Notification from bh7cw.me</h1>"+
 			"<p>Hi %v,</p>"+
 			"<p>The answer %v, %v to your question %v, %v on bh7cw.me has been deleted.</p>"+
 			"<p>This email was sent from bh7cw.me with <a href='https://aws.amazon.com/ses/'>Amazon SES</a>.</p>"+
 			"<p><a href='%v'>Unsubscribe</a></p>",
-			strings.TrimLeft(email_context[3], "UserName: "), email_context[5], email_context[6], email_context[1], email_context[2], unsubscribe_url)
+			strings.TrimSpace(strings.Split(email_context[3], ":")[1]), email_context[5], email_context[6], email_context[1], email_context[2], unsubscribe_url)
 		TextBody = fmt.Sprintf("Hi %v,\n"+
 			"The answer %v, %v to your question %v, %v on bh7cw.me has been deleted.\n"+
 			"This email was sent from bh7cw.me with Amazon SES.\n"+
 			"Unsubscribe: %v.",
-			strings.TrimLeft(email_context[3], "UserName: "), email_context[5], email_context[6], email_context[1], email_context[2], unsubscribe_url)
+			strings.TrimSpace(strings.Split(email_context[3], ":")[1]), email_context[5], email_context[6], email_context[1], email_context[2], unsubscribe_url)
 	} else {
 		log.Println("The message is not started as expected")
 	}
