@@ -13,7 +13,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/dynamodb/dynamodbattribute"
 	"github.com/aws/aws-sdk-go/service/ses"
 	"log"
-	"os"
 	"strings"
 	"time"
 )
@@ -59,8 +58,8 @@ func handleRequest(ctx context.Context, event events.SNSEvent) error {
 	log.Printf("Number of Records: %v", len(event.Records))
 
 	//log record message
-	for i, m := range event.Records {
-		log.Printf("Record Message No.%v: %v", i, m.SNS.Message)
+	for _, m := range event.Records {
+		log.Printf("Record Message: %v", m.SNS.Message)
 
 		//send email to the user with sns notification message
 		SendSESEmail(m.SNS.Message)
@@ -69,13 +68,6 @@ func handleRequest(ctx context.Context, event events.SNSEvent) error {
 	//log timestamp
 	currentTime = time.Now()
 	log.Printf("Invocation completed: %v", currentTime.Format("2020-11-26 15:04:05"))
-
-	// environment variables
-	log.Printf("REGION: %s", os.Getenv("AWS_REGION"))
-	log.Println("ALL ENV VARS:")
-	for _, element := range os.Environ() {
-		log.Println(element)
-	}
 
 	return nil
 }
