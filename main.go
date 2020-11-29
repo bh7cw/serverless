@@ -55,7 +55,7 @@ func handleRequest(ctx context.Context, event events.SNSEvent) error {
 		log.Printf("Record Message: %v", m.SNS.Message)
 
 		//send email to the user with sns notification message
-		SendSESEmail(m.SNS.Message)
+		SendSESEmail(m.SNS.Message, m.SNS.UnsubscribeURL)
 	}
 
 	//log timestamp
@@ -117,7 +117,7 @@ func initDBClient() *dynamodb.DynamoDB {
 }
 
 //send email to the user with sns notification message
-func SendSESEmail(message string) {
+func SendSESEmail(message string, unsubscribe_url string) {
 	// Create an SES session.
 	svc_ses := initSESClient()
 
@@ -153,13 +153,17 @@ func SendSESEmail(message string) {
 			"<p>The question %v, %v on bh7cw.me has been answered.</p>"+
 			"<p>Answer: %v, %v.</p>"+
 			"<p>See more details in %v.</p>"+
-			"<p>This email was sent from <a href='%v'>bh7cw.me</a> with <a href='https://aws.amazon.com/ses/'>Amazon SES</a>.</p>",
-			strings.TrimLeft(email_context[3], "UserName: "), email_context[1], email_context[2], email_context[5], email_context[6], email_context[7], email_context[7])
+			"<p>This email was sent from <a href='%v'>bh7cw.me</a> with <a href='https://aws.amazon.com/ses/'>Amazon SES</a>.</p>"+
+			"<p><a href='%v'>Unsubscribe</a></p>",
+			strings.TrimLeft(email_context[3], "UserName: "), email_context[1], email_context[2], email_context[5], email_context[6], email_context[7], email_context[7], unsubscribe_url)
 		TextBody = fmt.Sprintf("Hi %v,\n"+
 			"The question %v, %v on bh7cw.me has been answered.\n"+
 			"Answer: %v, %v.\n"+
 			"See more details in %v.\n"+
-			"This email was sent from bh7cw.me with Amazon SES.\n", strings.TrimLeft(email_context[3], "UserName: "), email_context[1], email_context[2], email_context[5], email_context[6], email_context[7])
+			"This email was sent from bh7cw.me with Amazon SES.\n"+
+			"Unsubscribe: %v.",
+			strings.TrimLeft(email_context[3], "UserName: "), email_context[1], email_context[2], email_context[5], email_context[6], email_context[7],
+			unsubscribe_url)
 	} else if email_context[0] == "update answer" {
 		Subject = fmt.Sprintf("The answer '%v' to your question '%v' on bh7cw.me has been updated", strings.TrimLeft(email_context[6], "AnswerText: "), strings.TrimLeft(email_context[2], "QuestionText: "))
 		HtmlBody = fmt.Sprintf("<h1>Notification from bh7cw.me</h1>"+
@@ -167,23 +171,29 @@ func SendSESEmail(message string) {
 			"<p>The answer to your question %v, %v on bh7cw.me has been updated.</p>"+
 			"<p>Answer: %v, %v.</p>"+
 			"<p>See more details in %v.</p>"+
-			"<p>This email was sent from <a href='%v'>bh7cw.me</a> with <a href='https://aws.amazon.com/ses/'>Amazon SES</a>.</p>",
-			strings.TrimLeft(email_context[3], "UserName: "), email_context[1], email_context[2], email_context[5], email_context[6], email_context[7], email_context[7])
+			"<p>This email was sent from <a href='%v'>bh7cw.me</a> with <a href='https://aws.amazon.com/ses/'>Amazon SES</a>.</p>"+
+			"<p><a href='%v'>Unsubscribe</a></p>",
+			strings.TrimLeft(email_context[3], "UserName: "), email_context[1], email_context[2], email_context[5], email_context[6], email_context[7], email_context[7], unsubscribe_url)
 		TextBody = fmt.Sprintf("Hi %v,\n"+
 			"The answer to your question %v, %v on bh7cw.me has been updated.\n"+
 			"Answer: %v, %v.\n"+
 			"See more details in %v.\n"+
-			"This email was sent from bh7cw.me with Amazon SES.\n", strings.TrimLeft(email_context[3], "UserName: "), email_context[1], email_context[2], email_context[5], email_context[6], email_context[7])
+			"This email was sent from bh7cw.me with Amazon SES.\n"+
+			"Unsubscribe: %v.",
+			strings.TrimLeft(email_context[3], "UserName: "), email_context[1], email_context[2], email_context[5], email_context[6], email_context[7], unsubscribe_url)
 	} else if email_context[0] == "delete answer" {
 		Subject = fmt.Sprintf("The answer '%v' to your question '%v' on bh7cw.me has been deleted", strings.TrimLeft(email_context[6], "AnswerText: "), strings.TrimLeft(email_context[2], "QuestionText: "))
 		HtmlBody = fmt.Sprintf("<h1>Notification from bh7cw.me</h1>"+
 			"<p>Hi %v,</p>"+
 			"<p>The answer %v, %v to your question %v, %v on bh7cw.me has been deleted.</p>"+
-			"<p>This email was sent from bh7cw.me with <a href='https://aws.amazon.com/ses/'>Amazon SES</a>.</p>",
-			strings.TrimLeft(email_context[3], "UserName: "), email_context[5], email_context[6], email_context[1], email_context[2])
+			"<p>This email was sent from bh7cw.me with <a href='https://aws.amazon.com/ses/'>Amazon SES</a>.</p>"+
+			"<p><a href='%v'>Unsubscribe</a></p>",
+			strings.TrimLeft(email_context[3], "UserName: "), email_context[5], email_context[6], email_context[1], email_context[2], unsubscribe_url)
 		TextBody = fmt.Sprintf("Hi %v,\n"+
 			"The answer %v, %v to your question %v, %v on bh7cw.me has been deleted.\n"+
-			"This email was sent from bh7cw.me with Amazon SES.\n", strings.TrimLeft(email_context[3], "UserName: "), email_context[5], email_context[6], email_context[1], email_context[2])
+			"This email was sent from bh7cw.me with Amazon SES.\n"+
+			"Unsubscribe: %v.",
+			strings.TrimLeft(email_context[3], "UserName: "), email_context[5], email_context[6], email_context[1], email_context[2], unsubscribe_url)
 	} else {
 		log.Println("The message is not started as expected")
 	}
@@ -318,6 +328,6 @@ func addItemToDynamoDB(TextBody string) error {
 func main() {
 	lambda.Start(handleRequest)
 	//test
-	//SendSESEmail("update answer, QuestionID: 1, QuestionText: meaning of cat, UserName: Jane Jenny, UserEmail: jingzhangng20@gmail.com, AnswerID: 1, AnswerText: lovely, Link: http://prod.bh7cw.me:80/v1/question/b1db1852-5c5f-457c-b94d-56b917064eee/answer/931bb982-3573-4187-a8e6-d0870901b880")
+	//SendSESEmail("update answer, QuestionID: 1, QuestionText: meaning of cat, UserName: Jane Jenny, UserEmail: jingzhangng20@gmail.com, AnswerID: 1, AnswerText: lovely, Link: http://prod.bh7cw.me:80/v1/question/b1db1852-5c5f-457c-b94d-56b917064eee/answer/931bb982-3573-4187-a8e6-d0870901b880","https://sns.us-east-1.amazonaws.com/?Action=Unsubscribe\u0026SubscriptionArn=arn:aws:sns:us-east-1:907204364947:topic:93f10269-ced3-41e2-bf2c-484d0edbf8d1")
 	//SendSESEmail("delete answer, QuestionID: 1, QuestionText: meaning of cat, UserName: Jane Jenny, UserEmail: jingzhangng20@gmail.com, AnswerID: 1, AnswerText: lovely")
 }
