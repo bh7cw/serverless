@@ -2,6 +2,12 @@
 
 name: Build & Deploy serverless
 
+env:
+  ARTIFACT_NAME: csye6225-serverless-${{ github.sha }}.zip
+  CODEDEPLOY_APPLICATION_NAME: csye6225-serverless
+  CODEDEPLOY_APPLICATION_DEPLOYMENT_GROUP_NAME: csye6225-serverless-deployment
+  AWS_REGION: us-east-1
+
 # Controls when the action will run. 
 on:
   # Triggers the workflow on push or pull request events but only for the master branch
@@ -23,12 +29,55 @@ jobs:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
 
-      # Runs a single command using the runners shell
-      - name: Run a one-line script
-        run: echo Hello, world!
+      - name: Set up Go 1.x
+          uses: actions/setup-go@v2
+          with:
+            go-version: ^1.15
+          id: go
 
-      # Runs a set of commands using the runners shell
-      - name: Run a multi-line script
-        run: |
-          echo Add other actions to build,
-          echo test, and deploy your project.
+            - name: Go Build
+              run: |
+                pwd
+                ls
+                GOOS=linux go build main.go
+                pwd
+                ls -al
+            - name: Build Deployment Artifact
+              run: |
+                mkdir codedeploy_artifact
+                echo "${{ env.ARTIFACT_NAME }}"
+                zip -r ${{ env.ARTIFACT_NAME }} main codedeploy/*.sh appspec.yml cloudwatch-config.json
+                pwd
+                ls -al
+                mv ${{ env.ARTIFACT_NAME }} codedeploy_artifact/
+                ls -al
+                pwd
+                cd codedeploy_artifact
+                pwd
+                ls -al
+                cd ..
+                pwd
+                ls -al
+            - name: Configure AWS credentials
+              uses: aws-actions/configure-aws-credentials@v1
+              with:
+                aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+                aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+                aws-region: ${{ env.AWS_REGION }}
+
+            - name: Copy Artifact to S3
+              run: |
+                aws s3 sync ./codedeploy_artifact s3://${{ secrets.S3_CODEDEPLY_BUCKET }}
+            - name: CodeDeploy API call
+              run: |
+                output=$(aws deploy create-deployment \
+                  --application-name ${{ env.CODEDEPLOY_APPLICATION_NAME }} \
+                  --deployment-config-name CodeDeployDefault.AllAtOnce \
+                  --deployment-group-name ${{ env.CODEDEPLOY_APPLICATION_DEPLOYMENT_GROUP_NAME }} \
+                  --description "CSYE6225 CodeDeploy serverless" \
+                  --s3-location bucket=${{ secrets.S3_CODEDEPLY_BUCKET }},key=${{ env.ARTIFACT_NAME }},bundleType=zip \
+                  --region ${{ env.AWS_REGION }} \
+                  --output json)
+                echo $output
+                dId=$(echo $output | jq -r '.deploymentId')
+                aws deploy wait deployment-successful --deployment-id $dId
