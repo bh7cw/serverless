@@ -3,7 +3,7 @@ This repository is used to log sns events in cloud watch.
 It's running on aws lambda.
 
 Secret:
-- 'cicd' user permission in `dev` or `prod`
+- 'cicd_lambda' user credentials in `dev` or `prod`
 - bucketname to store serverless application
 
 Reference:
